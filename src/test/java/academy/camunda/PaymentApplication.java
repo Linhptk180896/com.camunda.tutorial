@@ -1,7 +1,6 @@
 package academy.camunda;
 
 import academy.handler.CreditCardServiceHandler;
-import academy.handler.ServiceTaskHandler;
 import io.camunda.zeebe.client.ZeebeClient;
 import io.camunda.zeebe.client.api.response.ProcessInstanceEvent;
 import io.camunda.zeebe.client.api.worker.JobWorker;
@@ -13,7 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 
-public class SimpleModel {
+public class PaymentApplication {
 
     private static final String ZEEBE_ADDRESS = "bd33d8d7-04e0-4484-9d49-3235ad899a99.ont-1.zeebe.camunda.io:443";
     private static final String ZEEBE_CLIENT_ID = "t8zhcNtRzIw4Nz~CopppLP6pzF9VgsQ5";
@@ -35,33 +34,34 @@ public class SimpleModel {
                 .build()) {
             System.out.println("Connected to: " + client.newTopologyRequest().send().join());
 
+            final Map<String, Object> variables = new HashMap<String, Object>();
+            variables.put("reference", "C8_12345");
+            variables.put("amount", Double.valueOf(100.00));
+            variables.put("cardNumber", "1234567812345678");
+            variables.put("cardExpiry", "12/2023");
+            variables.put("cardCVC", "123");
 
-            //Add a new Create Instance Command
+            //Add a new Create Instance Command beneath the map of process variables
             ProcessInstanceEvent processInstanceEvent = client.newCreateInstanceCommand()
-                    .bpmnProcessId("simplemodel")
+                    .bpmnProcessId("paymentProcess")
                     .latestVersion()
+                    .variables(variables)
                     .send()
                     .join();
 
             processInstanceKey = processInstanceEvent.getProcessInstanceKey();
             processDefinitionKey = processInstanceEvent.getProcessDefinitionKey();
-            System.out.println("processInstanceKey = " + processInstanceKey);
-            System.out.println("processDefinitionKey = " + processDefinitionKey);
 
-            // create a Job Worker using the Job Handler that was implemented in the previous section.
-            // The Job Worker will process any task with the serviceTask type and will execute a Job Handler for that task.
-            final JobWorker serviceTaskWorker =
+            final JobWorker creditCardWorker =
                     client.newWorker()
-                            .jobType("serviceTask")
-                            .handler(new ServiceTaskHandler())
+                            .jobType("chargeCreditCard")
+                            .handler(new CreditCardServiceHandler())
                             .timeout(Duration.ofSeconds(10).toMillis())
                             .open();
             Thread.sleep(10000);
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-        ;
 
     }
 
