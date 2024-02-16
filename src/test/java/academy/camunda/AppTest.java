@@ -1,4 +1,4 @@
-package com.camunda;
+package academy.camunda;
 
 import junit.framework.Test;
 import junit.framework.TestCase;

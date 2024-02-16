@@ -16,5 +16,15 @@
       <option name="name" value="JBoss Community repository" />
       <option name="url" value="https://repository.jboss.org/nexus/content/repositories/public/" />
     </remote-repository>
+    <remote-repository>
+      <option name="id" value="snapshots" />
+      <option name="name" value="Archiva Managed Snapshot Repository" />
+      <option name="url" value="https://crm-m.nttdata-emea.com/archiva/repository/snapshots" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="internal" />
+      <option name="name" value="Archiva Managed Internal Repository" />
+      <option name="url" value="https://crm-m.nttdata-emea.com/archiva/repository/internal" />
+    </remote-repository>
   </component>
 </project>

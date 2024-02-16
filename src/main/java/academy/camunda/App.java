@@ -1,4 +1,4 @@
-package com.camunda;
+package academy.camunda;
 
 /**
  * Hello world!
