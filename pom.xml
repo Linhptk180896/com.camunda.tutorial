@@ -56,7 +56,7 @@
     </dependency>
 
 
-      <!-- https://mvnrepository.com/artifact/io.github.bonigarcia/webdrivermanager -->
+     <!-- https://mvnrepository.com/artifact/io.github.bonigarcia/webdrivermanager -->
     <dependency>
       <groupId>io.github.bonigarcia</groupId>
       <artifactId>webdrivermanager</artifactId>
@@ -69,6 +69,14 @@
       <artifactId>selenium-java</artifactId>
       <version>4.16.1</version>
     </dependency>
+
+    <!-- https://mvnrepository.com/artifact/io.camunda/zeebe-process-test-extension-testcontainer -->
+    <dependency>
+      <groupId>io.camunda</groupId>
+      <artifactId>zeebe-process-test-extension-testcontainer</artifactId>
+      <version>8.0.4</version>
+    </dependency>
+
 
 
   </dependencies>

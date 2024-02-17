@@ -5,20 +5,30 @@ import academy.handler.ServiceTaskHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.camunda.zeebe.client.ZeebeClient;
 import io.camunda.zeebe.client.api.response.ProcessInstanceEvent;
+import io.camunda.zeebe.client.api.response.ProcessInstanceResult;
 import io.camunda.zeebe.client.api.worker.JobWorker;
 import io.camunda.zeebe.client.impl.oauth.OAuthCredentialsProvider;
 import io.camunda.zeebe.client.impl.oauth.OAuthCredentialsProviderBuilder;
+import io.camunda.zeebe.process.test.api.ZeebeTestEngine;
+import io.camunda.zeebe.process.test.assertions.BpmnAssert;
+import io.camunda.zeebe.process.test.assertions.ProcessInstanceAssert;
+import io.camunda.zeebe.process.test.filters.RecordStream;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
+import org.junit.Assert;
 import org.junit.Test;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
 
+//@ZeebeProcessTest
 public class SimpleModel {
 
     private static final String ZEEBE_ADDRESS = "bd33d8d7-04e0-4484-9d49-3235ad899a99.ont-1.zeebe.camunda.io:443";
@@ -26,12 +36,22 @@ public class SimpleModel {
     private static final String ZEEBE_CLIENT_SECRET = "~R2sOdP0O.aESEYbxui5iMSYfHrtsrUcgejwIs_dkn5zUEd7qvUkUHfCf~0ufOpr";
     private static final String ZEEBE_AUTHORIZATION_SERVER_URL = "https://login.cloud.camunda.io/oauth/token";
     private static final String ZEEBE_TOKEN_AUDIENCE = "zeebe.camunda.io";
-    private static String clusterId = "bd33d8d7-04e0-4484-9d49-3235ad899a99";
+
+    private static final String CAMUNDA_CLUSTER_ID = "bd33d8d7-04e0-4484-9d49-3235ad899a99";
+    private static final String CAMUNDA_CLUSTER_REGION = "ont-1";
+    private static final String CAMUNDA_CREDENTIALS_SCOPES = "Zeebe,Operate,Optimize,Tasklist";
+    private static final String CAMUNDA_TASKLIST_BASE_URL = "https://ont-1.tasklist.camunda.io/bd33d8d7-04e0-4484-9d49-3235ad899a99";
+    private static final String CAMUNDA_OPTIMIZE_BASE_URL = "https://ont-1.optimize.camunda.io/bd33d8d7-04e0-4484-9d49-3235ad899a99";
+    private static final String CAMUNDA_OPERATE_BASE_URL = "https://ont-1.operate.camunda.io/bd33d8d7-04e0-4484-9d49-3235ad899a99";
+    private static final String CAMUNDA_OAUTH_URL = "https://login.cloud.camunda.io/oauth/token";
 
     private static long processInstanceKey;
     private static long processDefinitionKey;
+    public static String operateAccessToken;
+
 
     @Test
+
     public void verify_that_token_goes_through_events() {
         final OAuthCredentialsProvider credentialsProvider = new OAuthCredentialsProviderBuilder()
                 .authorizationServerUrl(ZEEBE_AUTHORIZATION_SERVER_URL).audience(ZEEBE_TOKEN_AUDIENCE)
@@ -72,27 +92,41 @@ public class SimpleModel {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        // Verify events that token goes through
-        String bodyRequest;
-        String processInstanceRequest = "processInstanceRequest.json";
-//        Map<String, String> requestBody = FileUtils.getInstance().readJsonFile(processInstanceRequest);
-        String filePath = System.getProperty("user.dir") + File.separator + "src" + File.separator + "test" + File.separator + "resources" + File.separator + processInstanceRequest;
-        ObjectMapper objectMapper = new ObjectMapper();
-        InputStream inputStream = null;
-        try {
-            inputStream = new FileInputStream(filePath);
-            bodyRequest = objectMapper.readTree(inputStream).toString();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        String clusterId = "bd33d8d7-04e0-4484-9d49-3235ad899a99";
-        Response flowNode = RestAssured.given()
-//                    .header("Authorization", )
-                .contentType(ContentType.JSON)
-                .body(bodyRequest)
-                .pathParam("clusterId", clusterId).log().all()
-                .post("https://ont-1.operate.camunda.io/{clusterId}/api/flow-node-instances");
 
+        String tokenRequest;
+        if (operateAccessToken == null || operateAccessToken.isEmpty()) {
+            //Get Access Token
+            tokenRequest = "tokenOperateRequest.json";
+            Map<String, String> jsonFileData = FileUtils.getInstance().readJsonFile(tokenRequest);
+            Response accessTokenResponse = RestAssured.given()
+                    .contentType(ContentType.JSON)
+                    .body(jsonFileData)
+                    .post("https://login.cloud.camunda.io/oauth/token");
+
+            operateAccessToken = accessTokenResponse.jsonPath().getString("access_token");
+
+
+            // Verify events that token goes through
+            String requestBody;
+            String processInstanceRequest = "processInstanceRequest.json";
+//            Map<String, String> requestBody = FileUtils.getInstance().readJsonFileUsingInputStream(processInstanceRequest);
+            String filePath = System.getProperty("user.dir") + File.separator + "src" + File.separator + "test" + File.separator + "resources" + File.separator + processInstanceRequest;
+            ObjectMapper objectMapper = new ObjectMapper();
+            InputStream inputStream;
+            try {
+                inputStream = new FileInputStream(filePath);
+                requestBody = String.format(objectMapper.readTree(inputStream).toString(), processInstanceKey, processInstanceKey);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            Response flowNodeInstances = RestAssured.given()
+                    .header("Authorization", "Bearer " + operateAccessToken)
+                    .header("content-type", "application/json")
+                    .body(requestBody)
+                    .post(CAMUNDA_OPERATE_BASE_URL + "/api/flow-node-instances");
+            Assert.assertEquals("", "startEvent", flowNodeInstances.jsonPath().getString(processInstanceKey + ".children[0].flowNodeId"));
+            Assert.assertEquals("", "COMPLETED", flowNodeInstances.jsonPath().getString(processInstanceKey + ".children[0].state"));
+        }
     }
 }
 

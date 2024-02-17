@@ -1,11 +1,9 @@
 {
-  "filter": {
-    "processInstanceKey": 2251799815580690
-  },
-  "sort": [
+  "queries": [
     {
-      "field": "startDate",
-      "order": "ASC"
+      "processInstanceId": "%d",
+      "treePath": "%d",
+      "pageSize": 50
     }
   ]
 }
