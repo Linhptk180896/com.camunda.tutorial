@@ -1,8 +1,8 @@
 {
   "queries": [
     {
-      "processInstanceId": "%d",
-      "treePath": "%d",
+      "processInstanceId": "'%s'",
+      "treePath": "'%s'",
       "pageSize": 50
     }
   ]

@@ -5,14 +5,10 @@ import academy.handler.ServiceTaskHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.camunda.zeebe.client.ZeebeClient;
 import io.camunda.zeebe.client.api.response.ProcessInstanceEvent;
-import io.camunda.zeebe.client.api.response.ProcessInstanceResult;
 import io.camunda.zeebe.client.api.worker.JobWorker;
 import io.camunda.zeebe.client.impl.oauth.OAuthCredentialsProvider;
 import io.camunda.zeebe.client.impl.oauth.OAuthCredentialsProviderBuilder;
-import io.camunda.zeebe.process.test.api.ZeebeTestEngine;
-import io.camunda.zeebe.process.test.assertions.BpmnAssert;
-import io.camunda.zeebe.process.test.assertions.ProcessInstanceAssert;
-import io.camunda.zeebe.process.test.filters.RecordStream;
+
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
@@ -48,6 +44,7 @@ public class SimpleModel {
     private static long processInstanceKey;
     private static long processDefinitionKey;
     public static String operateAccessToken;
+    public static String tasklistAccessToken;
 
 
     @Test
@@ -69,7 +66,7 @@ public class SimpleModel {
 
             //Add a new Create Instance Command
             ProcessInstanceEvent processInstanceEvent = client.newCreateInstanceCommand()
-                    .bpmnProcessId("simplemodel")
+                    .bpmnProcessId("simpleModel")
                     .latestVersion()
                     .variables(variables)
                     .send()
@@ -84,7 +81,7 @@ public class SimpleModel {
             // The Job Worker will process any task with the serviceTask type and will execute a Job Handler for that task.
             final JobWorker serviceTaskWorker =
                     client.newWorker()
-                            .jobType("serviceTask")
+                            .jobType("serviceTask1")
                             .handler(new ServiceTaskHandler())
                             .timeout(Duration.ofSeconds(10).toMillis())
                             .open();
@@ -97,36 +94,74 @@ public class SimpleModel {
         if (operateAccessToken == null || operateAccessToken.isEmpty()) {
             //Get Access Token
             tokenRequest = "tokenOperateRequest.json";
-            Map<String, String> jsonFileData = FileUtils.getInstance().readJsonFile(tokenRequest);
+            Map<String, String> jsonFileData = FileUtils.getInstance().readJsonFileToMap(tokenRequest);
             Response accessTokenResponse = RestAssured.given()
                     .contentType(ContentType.JSON)
                     .body(jsonFileData)
-                    .post("https://login.cloud.camunda.io/oauth/token");
+                    .post(CAMUNDA_OAUTH_URL);
 
             operateAccessToken = accessTokenResponse.jsonPath().getString("access_token");
 
-
-            // Verify events that token goes through
-            String requestBody;
-            String processInstanceRequest = "processInstanceRequest.json";
-//            Map<String, String> requestBody = FileUtils.getInstance().readJsonFileUsingInputStream(processInstanceRequest);
-            String filePath = System.getProperty("user.dir") + File.separator + "src" + File.separator + "test" + File.separator + "resources" + File.separator + processInstanceRequest;
-            ObjectMapper objectMapper = new ObjectMapper();
-            InputStream inputStream;
-            try {
-                inputStream = new FileInputStream(filePath);
-                requestBody = String.format(objectMapper.readTree(inputStream).toString(), processInstanceKey, processInstanceKey);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            Response flowNodeInstances = RestAssured.given()
-                    .header("Authorization", "Bearer " + operateAccessToken)
-                    .header("content-type", "application/json")
-                    .body(requestBody)
-                    .post(CAMUNDA_OPERATE_BASE_URL + "/api/flow-node-instances");
-            Assert.assertEquals("", "startEvent", flowNodeInstances.jsonPath().getString(processInstanceKey + ".children[0].flowNodeId"));
-            Assert.assertEquals("", "COMPLETED", flowNodeInstances.jsonPath().getString(processInstanceKey + ".children[0].state"));
+            System.out.println("operateAccessToken = " + operateAccessToken);
         }
+        // Service task: Verify events that token goes through
+        String requestBody;
+//        String processInstanceRequest = "processInstanceRequest.json";
+////            Map<String, String> requestBody = FileUtils.getInstance().readJsonFileUsingInputStream(processInstanceRequest);
+//        String filePath = System.getProperty("user.dir") + File.separator + "src" + File.separator + "test" + File.separator + "resources" + File.separator + processInstanceRequest;
+//        ObjectMapper objectMapper = new ObjectMapper();
+//        InputStream inputStream;
+//        try {
+//            inputStream = new FileInputStream(filePath);
+//            requestBody = String.format(objectMapper.readTree(inputStream).toString(), processInstanceKey, processInstanceKey);
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
+        requestBody = FileUtils.getInstance().readJsonFileToString("processInstanceRequest.json", processInstanceKey, processInstanceKey);
+        Response flowNodeInstances = RestAssured.given()
+                .header("Authorization", "Bearer " + operateAccessToken)
+                .header("content-type", "application/json")
+                .body(requestBody)
+                .post(CAMUNDA_OPERATE_BASE_URL + "/api/flow-node-instances");
+        Assert.assertEquals("", "startEvent", flowNodeInstances.jsonPath().getString(processInstanceKey + ".children[0].flowNodeId"));
+        Assert.assertEquals("", "COMPLETED", flowNodeInstances.jsonPath().getString(processInstanceKey + ".children[0].state"));
+
+        //User task:
+        //1. Get Task list access token
+        if (tasklistAccessToken == null || tasklistAccessToken.isEmpty()) {
+            tokenRequest = "tokenTasklistRequest.json";
+            Map<String, String> jsonFileData = FileUtils.getInstance().readJsonFileToMap(tokenRequest);
+            Response taskListAccessTokenResponse = RestAssured.given()
+                    .contentType(ContentType.JSON)
+                    .body(jsonFileData)
+                    .post(CAMUNDA_OAUTH_URL);
+
+            tasklistAccessToken = taskListAccessTokenResponse.jsonPath().getString("access_token");
+            System.out.println("tasklistAccessToken = " + tasklistAccessToken);
+        }
+        //2. Get user tasks that are available
+        Response taskListAccessTokenResponse = RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body(FileUtils.getInstance().readJsonFileToString("getTaskListRequest.json"))
+                .post(CAMUNDA_OAUTH_URL);
+
+        tasklistAccessToken = taskListAccessTokenResponse.jsonPath().getString("access_token");
+
+        //3. Click on btn assign to me
+        Response assignTaskResponse = RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body(FileUtils.getInstance().readJsonFileToString("getTaskListRequest.json"))
+                .post(CAMUNDA_OAUTH_URL);
+
+        tasklistAccessToken = taskListAccessTokenResponse.jsonPath().getString("access_token");
+
+        //4. Fill data and click on complete task
+
+
+
+
+
+
     }
 }
 
