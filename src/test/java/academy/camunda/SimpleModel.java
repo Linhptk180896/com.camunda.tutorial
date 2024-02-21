@@ -2,6 +2,7 @@ package academy.camunda;
 
 import Utils.FileUtils;
 import academy.handler.ServiceTaskHandler;
+import academy.pojo.ProcessInstanceRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.camunda.zeebe.client.ZeebeClient;
 import io.camunda.zeebe.client.api.response.ProcessInstanceEvent;
@@ -20,7 +21,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -104,8 +107,11 @@ public class SimpleModel {
 
             System.out.println("operateAccessToken = " + operateAccessToken);
         }
-        // Service task: Verify events that token goes through
+
+        //Verify events that token goes through
+        // Service task
         String requestBody;
+        //Approach 1: Use String.format to get json
 //        String processInstanceRequest = "processInstanceRequest.json";
 ////            Map<String, String> requestBody = FileUtils.getInstance().readJsonFileUsingInputStream(processInstanceRequest);
 //        String filePath = System.getProperty("user.dir") + File.separator + "src" + File.separator + "test" + File.separator + "resources" + File.separator + processInstanceRequest;
@@ -117,11 +123,25 @@ public class SimpleModel {
 //        } catch (IOException e) {
 //            throw new RuntimeException(e);
 //        }
+        //Approach 2: Use pojo
         requestBody = FileUtils.getInstance().readJsonFileToString("processInstanceRequest.json", processInstanceKey, processInstanceKey);
+        Object requestData;
+        requestData = new ProcessInstanceRequest();
+        ((ProcessInstanceRequest) requestData).setProcessInstanceId(Long.toString(processInstanceKey));
+        ((ProcessInstanceRequest) requestData).setTreePath(Long.toString(processInstanceKey));
+        ((ProcessInstanceRequest) requestData).setPageSize(50);
+        List<Map<String, Object>> requestDataListMap = new ArrayList<>();
+        Map<String, Object> requestDataMap = new HashMap<>();
+        requestDataMap.put("processInstanceId", ((ProcessInstanceRequest) requestData).getProcessInstanceId());
+        requestDataMap.put("treePath", ((ProcessInstanceRequest) requestData).getTreePath());
+        requestDataMap.put("pageSize", ((ProcessInstanceRequest) requestData).getPageSize());
+        requestDataListMap.add(requestDataMap);
+        ((ProcessInstanceRequest) requestData).setQueries(requestDataListMap);
+
         Response flowNodeInstances = RestAssured.given()
                 .header("Authorization", "Bearer " + operateAccessToken)
                 .header("content-type", "application/json")
-                .body(requestBody)
+                .body(requestData)
                 .post(CAMUNDA_OPERATE_BASE_URL + "/api/flow-node-instances");
         Assert.assertEquals("", "startEvent", flowNodeInstances.jsonPath().getString(processInstanceKey + ".children[0].flowNodeId"));
         Assert.assertEquals("", "COMPLETED", flowNodeInstances.jsonPath().getString(processInstanceKey + ".children[0].state"));
