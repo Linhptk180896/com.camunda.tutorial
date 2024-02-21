@@ -124,7 +124,7 @@ public class SimpleModel {
 //            throw new RuntimeException(e);
 //        }
         //Approach 2: Use pojo
-        requestBody = FileUtils.getInstance().readJsonFileToString("processInstanceRequest.json", processInstanceKey, processInstanceKey);
+//        requestBody = FileUtils.getInstance().readJsonFileToString("processInstanceRequest.json", processInstanceKey, processInstanceKey);
         Object requestData;
         requestData = new ProcessInstanceRequest();
         ((ProcessInstanceRequest) requestData).setProcessInstanceId(Long.toString(processInstanceKey));
