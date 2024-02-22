@@ -2,8 +2,18 @@ package academy.camunda;
 
 import Utils.FileUtils;
 import academy.handler.ServiceTaskHandler;
+import academy.pojo.AssignTaskRequest;
+import academy.pojo.GetTaskListRequest;
 import academy.pojo.ProcessInstanceRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import io.camunda.common.auth.*;
+import io.camunda.tasklist.CamundaTaskListClient;
+import io.camunda.tasklist.dto.Task;
+import io.camunda.tasklist.dto.TaskList;
+import io.camunda.tasklist.dto.TaskState;
+import io.camunda.tasklist.exception.TaskListException;
 import io.camunda.zeebe.client.ZeebeClient;
 import io.camunda.zeebe.client.api.response.ProcessInstanceEvent;
 import io.camunda.zeebe.client.api.worker.JobWorker;
@@ -11,20 +21,17 @@ import io.camunda.zeebe.client.impl.oauth.OAuthCredentialsProvider;
 import io.camunda.zeebe.client.impl.oauth.OAuthCredentialsProviderBuilder;
 
 import io.restassured.RestAssured;
+import io.restassured.common.mapper.TypeRef;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import org.junit.Assert;
 import org.junit.Test;
+import org.openqa.selenium.json.Json;
+import org.testcontainers.shaded.com.fasterxml.jackson.databind.JsonNode;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 
 //@ZeebeProcessTest
@@ -48,6 +55,7 @@ public class SimpleModel {
     private static long processDefinitionKey;
     public static String operateAccessToken;
     public static String tasklistAccessToken;
+    public static String username;
 
 
     @Test
@@ -108,7 +116,20 @@ public class SimpleModel {
             System.out.println("operateAccessToken = " + operateAccessToken);
         }
 
+        //Read username from properties file
+        Properties properties = new Properties();
+        InputStream inputStream;
+        try {
+            String filePath = System.getProperty("user.dir");
+            inputStream = new FileInputStream(filePath + "/src/test/resources/LOCAL.properties");
+            properties.load(inputStream);
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+        username = properties.getProperty("username");
+
         //Verify events that token goes through
+
         // Service task
         String requestBody;
         //Approach 1: Use String.format to get json
@@ -137,7 +158,6 @@ public class SimpleModel {
         requestDataMap.put("pageSize", ((ProcessInstanceRequest) requestData).getPageSize());
         requestDataListMap.add(requestDataMap);
         ((ProcessInstanceRequest) requestData).setQueries(requestDataListMap);
-
         Response flowNodeInstances = RestAssured.given()
                 .header("Authorization", "Bearer " + operateAccessToken)
                 .header("content-type", "application/json")
@@ -160,27 +180,92 @@ public class SimpleModel {
             System.out.println("tasklistAccessToken = " + tasklistAccessToken);
         }
         //2. Get user tasks that are available
-        Response taskListAccessTokenResponse = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(FileUtils.getInstance().readJsonFileToString("getTaskListRequest.json"))
-                .post(CAMUNDA_OAUTH_URL);
+        Object getTaskListRequest;
+        getTaskListRequest = new GetTaskListRequest();
+        Map<String, Object> sortMap = new HashMap<>();
+        ((GetTaskListRequest) getTaskListRequest).setField("creationTime");
+        ((GetTaskListRequest) getTaskListRequest).setOrder("DESC");
+        ((GetTaskListRequest) getTaskListRequest).setPageSize(50);
+        ((GetTaskListRequest) getTaskListRequest).setState("CREATED");
+        sortMap.put("field", ((GetTaskListRequest) getTaskListRequest).getField());
+        sortMap.put("order", ((GetTaskListRequest) getTaskListRequest).getOrder());
+        List<Map<String, Object>> sortMapList = new ArrayList<>();
+        sortMapList.add(sortMap);
+        ((GetTaskListRequest) getTaskListRequest).setSort(sortMapList);
+//        Response taskListResponse = RestAssured.given()
+//                .header("Authorization", "Bearer " + tasklistAccessToken)
+//                .contentType(ContentType.JSON)
+//                .body(getTaskListRequest)
+//                .post(CAMUNDA_TASKLIST_BASE_URL + "/v1/tasks/search");
+        String theFirstTaskListId = null;
 
-        tasklistAccessToken = taskListAccessTokenResponse.jsonPath().getString("access_token");
+        List<Map<String, Object>> listMap = RestAssured.given()
+                .header("Authorization", "Bearer " + tasklistAccessToken)
+                .contentType(ContentType.JSON)
+                .body(getTaskListRequest)
+                .post(CAMUNDA_TASKLIST_BASE_URL + "/v1/tasks/search")
+                .as(new TypeRef<>() {
+                });
+        for (Map<String, Object> map : listMap) {
+            if (map.get("processDefinitionKey").equals(Long.toString(processDefinitionKey))
+                    && map.get("processInstanceKey").equals(Long.toString(processInstanceKey))) {
+                theFirstTaskListId = map.get("id").toString();
+            }
+        }
 
         //3. Click on btn assign to me
-        Response assignTaskResponse = RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body(FileUtils.getInstance().readJsonFileToString("getTaskListRequest.json"))
-                .post(CAMUNDA_OAUTH_URL);
+        //case 1: Call API
+//        Object assignTaskRequest = new AssignTaskRequest();
+//        ((AssignTaskRequest) assignTaskRequest).setName("assignee");
+//        ((AssignTaskRequest) assignTaskRequest).setValue("\\\"linh linh\\\"");
+//        Map<String, Object> variablesMap = new HashMap<>();
+//        variablesMap.put("name", ((AssignTaskRequest) assignTaskRequest).getName());
+//        variablesMap.put("value", ((AssignTaskRequest) assignTaskRequest).getValue());
+//        List<Map<String, Object>> variablesMapList = new ArrayList<>();
+//        variablesMapList.add(variablesMap);
+//        ((AssignTaskRequest) assignTaskRequest).setVariables(variablesMapList);
 
-        tasklistAccessToken = taskListAccessTokenResponse.jsonPath().getString("access_token");
+//        Response assignTaskResponse = RestAssured.given()
+//                .header("Authorization", "Bearer " + tasklistAccessToken)
+//                .contentType(ContentType.JSON)
+//                .pathParam("taskListId", theFirstTaskListId)
+//                .body(assignTaskRequest)
+//                .patch(CAMUNDA_TASKLIST_BASE_URL + "/v1/tasks/{taskListId}/assign");
+
+        //cae 2: Use TaskList client
+        // Get tasklist authentication
+        JwtConfig jwtConfig = new JwtConfig();
+        jwtConfig.addProduct(Product.TASKLIST, new JwtCredential(ZEEBE_CLIENT_ID, ZEEBE_CLIENT_SECRET, "tasklist.camunda.io", "https://login.cloud.camunda.io/oauth/token"));
+        Authentication auth = SaaSAuthentication.builder().jwtConfig(jwtConfig).build();
+        System.out.println("tasklist auth =" + auth);
+        //Create client
+        CamundaTaskListClient client;
+        try {
+            client = CamundaTaskListClient.builder().taskListUrl(CAMUNDA_TASKLIST_BASE_URL).shouldReturnVariables().shouldLoadTruncatedVariables().authentication(auth).build();
+            TaskList taskList;
+            taskList = client.getTasks(false, TaskState.CREATED, 50);
+            for(Task task : taskList) {
+                //assign task to me
+                if (task.getProcessDefinitionKey().equals(Long.toString(processDefinitionKey))
+                        && task.getProcessInstanceKey().equals(Long.toString(processInstanceKey))){
+                    client.claim(task.getId(), username);
+                    Assert.assertEquals("", "CREATED", task.getTaskState().toString());
+                    Assert.assertEquals("", username, task.getAssignee());
+                }
+            }
+        } catch (TaskListException e) {
+            throw new RuntimeException(e);
+        }
+
 
         //4. Fill data and click on complete task
-
-
-
-
-
+//        Response completeTaskResponse = RestAssured.given()
+//                .header("Authorization", "Bearer " + tasklistAccessToken)
+//                .contentType(ContentType.JSON)
+//                .pathParam("taskListId", theFirstTaskListId)
+//                .body(assignTaskRequest)
+//                .patch(CAMUNDA_TASKLIST_BASE_URL + "/v1/tasks/{taskListId}/complete");
+//        Assert.assertEquals("", "COMPLETED", completeTaskResponse.jsonPath().getString("taskState"));
 
     }
 }
