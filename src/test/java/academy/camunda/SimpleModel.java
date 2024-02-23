@@ -2,6 +2,7 @@ package academy.camunda;
 
 import Utils.FileUtils;
 import academy.handler.ServiceTaskHandler;
+import academy.pojo.GetTaskListRequest;
 import academy.pojo.ProcessInstanceRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.camunda.zeebe.client.ZeebeClient;
@@ -124,7 +125,7 @@ public class SimpleModel {
 //            throw new RuntimeException(e);
 //        }
         //Approach 2: Use pojo
-        requestBody = FileUtils.getInstance().readJsonFileToString("processInstanceRequest.json", processInstanceKey, processInstanceKey);
+//        requestBody = FileUtils.getInstance().readJsonFileToString("processInstanceRequest.json", processInstanceKey, processInstanceKey);
         Object requestData;
         requestData = new ProcessInstanceRequest();
         ((ProcessInstanceRequest) requestData).setProcessInstanceId(Long.toString(processInstanceKey));
@@ -160,6 +161,12 @@ public class SimpleModel {
             System.out.println("tasklistAccessToken = " + tasklistAccessToken);
         }
         //2. Get user tasks that are available
+        Object getTaskListRequest;
+        getTaskListRequest = new GetTaskListRequest();
+        Map<String, Object> 
+        ((GetTaskListRequest) getTaskListRequest).setField("creationTime");
+        ((GetTaskListRequest) getTaskListRequest).setOrder("creationTime");
+
         Response taskListAccessTokenResponse = RestAssured.given()
                 .contentType(ContentType.JSON)
                 .body(FileUtils.getInstance().readJsonFileToString("getTaskListRequest.json"))
@@ -176,6 +183,7 @@ public class SimpleModel {
         tasklistAccessToken = taskListAccessTokenResponse.jsonPath().getString("access_token");
 
         //4. Fill data and click on complete task
+
 
 
 
