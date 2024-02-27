@@ -1,6 +1,6 @@
 {
   "grant_type": "client_credentials",
   "audience": "operate.camunda.io",
-  "client_id": "mOedrbgbQ4ecxujPyBi.4y0eOJQld618",
-  "client_secret": "jmEHn~BP9dsymC8FhqR.VmTrn9pauM22g-mV49v4bx9x6MFLXv6R_PLybIp_mnTs"
+  "client_id": "5W0ZZL096Q4J24Utr931PfKSUYX96ZCm",
+  "client_secret": "TXxEan7Rda4SMYaXFD27uuIEIXO0pecMPn~0-Kk6CvE3Hs2o0tpfRwQ4Ni8VqBd9"
 }

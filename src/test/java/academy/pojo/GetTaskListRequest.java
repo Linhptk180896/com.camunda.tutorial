@@ -4,17 +4,18 @@ import java.util.List;
 import java.util.Map;
 
 public class GetTaskListRequest {
-    public List<Map<String, String>> sort;
+    public List<Map<String, Object>> sort;
     public String field;
     public String order;
     public long pageSize;
     public String state;
 
-    public List<Map<String, String>> getSort() {
+
+    public List<Map<String, Object>> getSort() {
         return sort;
     }
 
-    public void setSort(List<Map<String, String>> sort) {
+    public void setSort(List<Map<String, Object>> sort) {
         this.sort = sort;
     }
 
@@ -49,5 +50,7 @@ public class GetTaskListRequest {
     public void setState(String state) {
         this.state = state;
     }
+
+
 
 }
