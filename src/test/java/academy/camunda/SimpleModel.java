@@ -68,6 +68,8 @@ public class SimpleModel {
         //Deploy BPMN diagram
 
 
+
+
         final Map<String, Object> variables = new HashMap<String, Object>();
         variables.put("name", "Linh");
         variables.put("age", "20");
